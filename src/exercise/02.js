@@ -2,14 +2,14 @@
 // http://localhost:3000/isolated/exercise/02.js
 
 import * as React from 'react'
+import {useCallback, useLayoutEffect, useRef} from 'react'
 import {
   fetchPokemon,
-  PokemonForm,
   PokemonDataView,
-  PokemonInfoFallback,
   PokemonErrorBoundary,
+  PokemonForm,
+  PokemonInfoFallback,
 } from '../pokemon'
-import {useCallback} from 'react'
 
 // 🐨 this is going to be our generic asyncReducer
 function asyncReducer(state, action) {
@@ -32,13 +32,35 @@ function asyncReducer(state, action) {
   }
 }
 
+const useSafeDispatch = dispatch => {
+  const mountedRef = useRef(false)
+
+  useLayoutEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  return useCallback((...args) => {
+    if (mountedRef.current) {
+      dispatch(...args)
+    }
+  }, [])
+}
+
 function useAsync(initialState) {
-  const [{status, error, data}, dispatch] = React.useReducer(asyncReducer, {
-    status: 'idle',
-    error: null,
-    data: null,
-    ...initialState,
-  })
+  const [{status, error, data}, unsafeDispatch] = React.useReducer(
+    asyncReducer,
+    {
+      status: 'idle',
+      error: null,
+      data: null,
+      ...initialState,
+    },
+  )
+
+  const dispatch = useSafeDispatch(unsafeDispatch)
 
   const run = useCallback(promise => {
     dispatch({type: 'pending'})
